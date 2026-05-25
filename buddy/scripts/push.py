@@ -44,6 +44,7 @@ DEFAULT_FILES = [
     "main.py",
     "buddy_ble.py",
     "buddy_ui_cp.py",
+    "buddy_ui_stats.py",
     "buddy_state.py",
     "buddy_chars.py",
     "buddy_protocol.py",
