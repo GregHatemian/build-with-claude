@@ -141,6 +141,22 @@ def _intent_for_key(k):
     return None
 
 
+def _switch_source(state, ble, ui):
+    """Toggle source_tab between CD and CC. Tears down the current BLE
+    advertise/connection, persists the new tab, repaints the UI on the
+    new renderer, and restarts BLE with the matching name prefix so the
+    correct host re-pairs.
+    """
+    new_tab = "CC" if state.source_tab == "CD" else "CD"
+    state.set_source_tab(new_tab)
+    # Graph data accumulated on the old source would lie if drawn under
+    # the new source's renderer — they're different scales.
+    state.reset_graph()
+    prefix = "Claude" if new_tab == "CD" else "ClaudeCC"
+    ble.restart_with_prefix(prefix)
+    ui.paint()
+
+
 def run():
     # Per-step prints so a hard fault during init (NimBLE Guru
     # Meditation, LCD driver crash, etc.) leaves a breadcrumb on the
@@ -187,10 +203,10 @@ def run():
     # radio before BLE asks for it.
     time.sleep_ms(1000)
 
-    ui = buddy_ui.BuddyUI()
-    print("claude_buddy: ui ready")
     state = buddy_state.BuddyState()
     print("claude_buddy: state ready")
+    ui = buddy_ui.make_ui(state)
+    print("claude_buddy: ui ready")
     ui.update_identity(state.name, state.owner)
 
     buddy_chars.sweep_partials()
@@ -266,6 +282,11 @@ def run():
     )
     print("claude_buddy: BuddyBLE returned")
 
+    # If the user previously set source_tab to CC, restore that on boot
+    # so the matching host re-pairs without a manual Tab press.
+    if state.source_tab == "CC":
+        ble.restart_with_prefix("ClaudeCC")
+
     proto = buddy_protocol.BuddyProtocol(
         state=state,
         ui=ui,
@@ -312,6 +333,14 @@ def run():
             kb.tick()
             k = kb.get_key()
             intent = _intent_for_key(k)
+
+            # Tab key switches the active source tab (CD ↔ CC). Checked
+            # before the intent dispatch so it doesn't conflict with the
+            # normal Y/N/Q semantic — Tab has no intent mapping.
+            if k == 0x09 or k == "\t":
+                _switch_source(state, ble, ui)
+                last_footer_ms = time.ticks_ms()
+                continue
 
             # An active unpair confirmation outranks any permission
             # prompt: pressing Y here means "yes, wipe me", not "yes,
