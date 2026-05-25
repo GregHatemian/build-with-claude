@@ -20,6 +20,17 @@ across reboots.
 import time
 
 
+# Stub MicroPython time functions for CPython testing.
+if not hasattr(time, 'ticks_ms'):
+    _ticks_ms_counter = 0
+    def _ticks_ms():
+        global _ticks_ms_counter
+        _ticks_ms_counter += 1000
+        return _ticks_ms_counter
+    time.ticks_ms = _ticks_ms
+    time.ticks_diff = lambda a, b: a - b
+
+
 try:
     import esp32
 
@@ -137,6 +148,10 @@ class BuddyState:
         self._nap_count = _get_int("nap", 0)
         self._last_action_ms = time.ticks_ms()
         self._nap_window_ms = 5 * 60 * 1000
+        # Daily budget + cumul graph.
+        self.daily_budget_tokens = _get_u32("daily_budget_tokens", 500_000)
+        # 60 samples × 15 min = 15 h horizon. Not persisted across reboots.
+        self.graph_samples = RingBuffer(capacity=60)
 
     def set_name(self, name: str) -> None:
         self.name = name[:32]
@@ -194,6 +209,33 @@ class BuddyState:
             "lvl": lvl,
         }
 
+    def set_daily_budget_tokens(self, n: int) -> None:
+        # Clamp to u32 range; negative is rejected silently (UI shouldn't
+        # allow it to begin with, but defensive).
+        if n < 0:
+            return
+        n = min(n, 0xFFFFFFFF)
+        self.daily_budget_tokens = n
+        _set_u32("daily_budget_tokens", n)
+
+    def budget_percentage(self, tokens_today: int):
+        # Return None when the budget is zero — caller must render "--%"
+        # rather than divide by zero. Clamp the upper bound at 999 so a
+        # user with a 1k-token budget who blows past it doesn't break
+        # the 3-char layout slot.
+        if self.daily_budget_tokens <= 0:
+            return None
+        pct = int(tokens_today * 100 // self.daily_budget_tokens)
+        if pct > 999:
+            pct = 999
+        return pct
+
+    def record_graph_sample(self, timestamp_ms: int, cum_tokens: int) -> None:
+        self.graph_samples.push((timestamp_ms, cum_tokens))
+
+    def reset_graph(self) -> None:
+        self.graph_samples.clear()
+
     def reset_all(self) -> None:
         """Called on unpair. Wipes name/owner/counters but not firmware."""
         self.name = "Buddy"
@@ -202,5 +244,7 @@ class BuddyState:
         self.deny = 0
         self._vel = 0.0
         self._nap_count = 0
-        for k in ("name", "owner", "appr", "deny", "nap"):
+        self.daily_budget_tokens = 500_000
+        self.graph_samples.clear()
+        for k in ("name", "owner", "appr", "deny", "nap", "daily_budget_tokens"):
             _erase(k)
