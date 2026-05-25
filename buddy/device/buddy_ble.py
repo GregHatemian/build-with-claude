@@ -236,6 +236,7 @@ class BuddyBLE:
         self._tx_h = stack["tx"]
         self._name = stack["name"]
         self._pairing_supported = stack["pairing"]
+        self._name_prefix = name_prefix
 
         # Initialize instance state BEFORE wiring the IRQ. The stack
         # is a singleton ([_ensure_stack]) so the controller stays live
@@ -523,6 +524,55 @@ class BuddyBLE:
             try:
                 self._ble.gap_disconnect(self._conn)
             except OSError:
+                pass
+
+    def restart_with_prefix(self, name_prefix: str):
+        """Swap the advertised GAP name prefix at runtime.
+
+        Tears down the current advertise and any active central
+        connection, reconfigures gap_name with the new prefix (keeping
+        the stable MAC suffix so paired bonds survive), then
+        re-advertises.  Idempotent: if the prefix is already active,
+        returns immediately without touching the stack.
+
+        Typical use: flip between "Claude" (CD source tab) and
+        "ClaudeCC" (CC source tab) so the matching host re-pairs.
+        """
+        if getattr(self, "_name_prefix", None) == name_prefix:
+            return
+
+        # Stop advertising before reconfiguring.
+        try:
+            self._ble.gap_advertise(None)
+        except OSError:
+            pass
+
+        # Drop any active central connection.
+        if self._conn is not None:
+            try:
+                self._ble.gap_disconnect(self._conn)
+            except OSError:
+                pass
+
+        # _ensure_stack is a singleton — it returns the cached stack
+        # without re-running init.  We update gap_name directly on the
+        # BLE object so _advertise() (which reads self._name) picks up
+        # the new prefix.
+        stack = _ensure_stack(name_prefix)
+        mac = stack["ble"].config("mac")[1]
+        new_name = "{}_{}".format(name_prefix, _mac_suffix(mac))
+        self._ble.config(gap_name=new_name)
+        self._name = new_name
+        self._name_prefix = name_prefix
+
+        # Re-advertise with the new name.
+        try:
+            self._advertise()
+        except OSError as e:
+            print("buddy_ble: restart_with_prefix advertise failed:", e)
+            try:
+                micropython.schedule(self._rearm_adv, 0)
+            except RuntimeError:
                 pass
 
     def deinit(self):
