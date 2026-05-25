@@ -66,6 +66,7 @@ to size 4 for cross-room readability.
 """
 
 import M5
+import buddy_ui_stats
 
 # Anthropic palette, inlined — byte-for-byte matches ui_theme.py.
 ORANGE = 0xCC785C
@@ -446,3 +447,75 @@ class BuddyUI:
         self._draw_header()
         self._draw_main()
         self.restore_button_hints()
+
+
+class _UIDispatcher:
+    """Routes UI calls to the renderer for the active source_tab.
+
+    The two underlying renderers have different constructors and
+    different method sets. The dispatcher mirrors whichever renderer
+    is active. Methods not present on the active renderer no-op
+    (CD-only methods called when CC is active, etc.) — that's the
+    correct behavior since the inactive renderer's events should not
+    fire on the wrong tab anyway.
+    """
+
+    def __init__(self, state):
+        self._state = state
+        self._cd = BuddyUI()                       # CD renderer takes no args
+        self._cc = buddy_ui_stats.StatsRenderer(state)
+
+    def _active(self):
+        return self._cd if self._state.source_tab == "CD" else self._cc
+
+    def paint(self):
+        active = self._active()
+        paint = getattr(active, "paint", None)
+        if paint is not None:
+            paint()
+        else:
+            # CD has no paint() — its set_connection / update_* methods
+            # do incremental redraws as state changes. Trigger a full
+            # CD redraw via update_identity + the current connection state.
+            self._cd.update_identity(self._state.name, self._state.owner)
+            self._cd.set_connection(self._cd._connection_state)
+
+    def switch_tab(self):
+        # Called by claude_buddy on Tab key. Repaint the now-active renderer.
+        self.paint()
+
+    def update_heartbeat(self, hb):
+        active = self._active()
+        if hasattr(active, "update_heartbeat"):
+            active.update_heartbeat(hb)
+        elif hasattr(active, "set_heartbeat"):  # StatsRenderer
+            active.set_heartbeat(hb)
+
+    def is_idle(self):
+        active = self._active()
+        if hasattr(active, "is_idle"):
+            return active.is_idle()
+        return True
+
+    def __getattr__(self, name):
+        # Any other call — forward to the active renderer if present;
+        # silently no-op otherwise. CD-only methods (set_connection,
+        # show_passkey, flash_*, update_identity, etc.) hit this path
+        # and route to BuddyUI when CD is active, no-op when CC is.
+        # CC-only methods (set_link) hit this and route to StatsRenderer
+        # when CC is active, no-op when CD is.
+        #
+        # __getattr__ only fires when normal attribute lookup fails,
+        # so it doesn't shadow paint/switch_tab/update_heartbeat/is_idle
+        # defined above.
+        active = self._active()
+        attr = getattr(active, name, None)
+        if callable(attr):
+            return attr
+        # Non-callable attribute access (rare, e.g., a property) —
+        # return a no-op callable so the call site doesn't crash.
+        return lambda *args, **kwargs: None
+
+
+def make_ui(state):
+    return _UIDispatcher(state)

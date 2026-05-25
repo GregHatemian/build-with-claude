@@ -40,6 +40,10 @@ class StatsRenderer:
     def set_heartbeat(self, hb: dict) -> None:
         self._hb = hb
 
+    # Alias for BuddyUI compatibility: dispatcher routes update_heartbeat
+    # to both renderers via the same call site.
+    update_heartbeat = set_heartbeat
+
     def paint(self) -> None:
         _LCD.fillScreen(BLACK)
         self._draw_header()
