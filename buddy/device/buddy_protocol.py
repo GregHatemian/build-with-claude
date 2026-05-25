@@ -33,7 +33,26 @@ import time
 
 FIRMWARE_VERSION = "m5buddy-0.1"
 
-_HEARTBEAT_FIELDS = ("total", "running", "waiting", "tokens", "tokens_today", "entries")
+_HEARTBEAT_FIELDS = (
+    "total", "running", "waiting", "tokens", "tokens_today",
+    "entries", "daily_total", "cache_read", "cache_create",
+    "cache_uncached", "prompt",
+)
+
+
+def _looks_like_heartbeat(msg: dict) -> bool:
+    """A heartbeat has no cmd/ack and at least one heartbeat-shape field."""
+    if "cmd" in msg or "ack" in msg:
+        return False
+    return any(k in msg for k in _HEARTBEAT_FIELDS)
+
+
+def _heartbeat_source(msg: dict) -> str:
+    """Source tag from a heartbeat. Missing/invalid → 'CD' for backward compat."""
+    src = msg.get("source", "CD")
+    if src not in ("CD", "CC"):
+        return "CD"
+    return src
 
 # Unpair is destructive (wipes name/owner/stats and disconnects). The
 # BLE link on UIFlow 2.0 is unauthenticated — see buddy_ble.py — so any
@@ -114,7 +133,7 @@ class BuddyProtocol:
             return
 
         # No "cmd" field → treat as heartbeat if it looks like one.
-        if any(k in msg for k in _HEARTBEAT_FIELDS) or "prompt" in msg:
+        if _looks_like_heartbeat(msg):
             self._on_heartbeat(msg)
             return
 
