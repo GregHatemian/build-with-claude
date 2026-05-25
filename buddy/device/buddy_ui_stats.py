@@ -62,7 +62,23 @@ class StatsRenderer:
         _LCD.drawFastHLine(0, 17, _W, DIM)
 
     def _draw_percentage(self) -> None:
-        pass  # task 9
+        daily_total = self._hb.get("daily_total", self._hb.get("tokens_today", 0))
+        pct = self._state.budget_percentage(daily_total) if self._state else None
+        if pct is None:
+            text = "--%"
+            color = GRAY_MID
+        else:
+            text = "{}%".format(pct)
+            if pct >= 90:
+                color = RED
+            elif pct >= 70:
+                color = YELLOW
+            else:
+                color = CYAN
+        _LCD.setTextSize(4)
+        _LCD.setTextColor(color, BLACK)
+        _LCD.drawString(text, 6, 18)
+        _LCD.setTextSize(1)  # restore for subsequent draws
 
     def _draw_subtitle(self) -> None:
         pass  # task 10
