@@ -62,6 +62,22 @@ def _set_int(key: str, value: int) -> None:
     _NVS.commit()
 
 
+def _get_u32(key: str, default: int = 0) -> int:
+    if _NVS is None:
+        return default
+    try:
+        return _NVS.get_u32(key)
+    except Exception:
+        return default
+
+
+def _set_u32(key: str, value: int) -> None:
+    if _NVS is None:
+        return
+    _NVS.set_u32(key, value)
+    _NVS.commit()
+
+
 def _erase(key: str) -> None:
     if _NVS is None:
         return
