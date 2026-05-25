@@ -81,7 +81,16 @@ class StatsRenderer:
         _LCD.setTextSize(1)  # restore for subsequent draws
 
     def _draw_subtitle(self) -> None:
-        pass  # task 10
+        daily_total = self._hb.get("daily_total", self._hb.get("tokens_today", 0))
+        budget = self._state.daily_budget_tokens if self._state else 0
+        cur = "{:,}".format(daily_total).replace(",", "'")
+        cap = "{:,}".format(budget).replace(",", "'") if budget else "--"
+        line = "{} / {} tok".format(cur, cap)
+        while _LCD.textWidth(line) > _W - 12 and len(line) > 1:
+            line = line[:-1]
+        _LCD.setTextSize(1)
+        _LCD.setTextColor(GRAY_MID, BLACK)
+        _LCD.drawString(line, 6, 52)
 
     def _draw_graph(self) -> None:
         pass  # task 11
