@@ -157,6 +157,13 @@ class BuddyProtocol:
         print("buddy_protocol: unclassified msg, keys:", list(msg.keys()))
 
     def _on_heartbeat(self, hb: dict) -> None:
+        # Reject heartbeats whose declared source doesn't match the
+        # currently-active tab. Defensive against both daemons writing
+        # simultaneously (which shouldn't happen by design — the device
+        # only advertises for one of them at a time — but guards against
+        # stale messages buffered through a slow BLE link).
+        if _heartbeat_source(hb) != self.state.source_tab:
+            return
         self.ui.update_heartbeat(hb)
         prompt = hb.get("prompt")
         if prompt and prompt.get("id"):
