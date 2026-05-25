@@ -87,6 +87,44 @@ def _erase(key: str) -> None:
         pass
 
 
+class RingBuffer:
+    """Fixed-capacity FIFO. push() evicts oldest when full.
+
+    Used for the cumul-graph sample series: (timestamp_ms, cum_tokens).
+    iter() yields samples in chronological order regardless of internal
+    rotation state.
+    """
+
+    def __init__(self, capacity: int):
+        if capacity <= 0:
+            raise ValueError("capacity must be positive")
+        self._capacity = capacity
+        self._buf = [None] * capacity
+        self._head = 0
+        self._size = 0
+
+    def push(self, item) -> None:
+        idx = (self._head + self._size) % self._capacity
+        self._buf[idx] = item
+        if self._size < self._capacity:
+            self._size += 1
+        else:
+            self._head = (self._head + 1) % self._capacity
+
+    def clear(self) -> None:
+        for i in range(self._capacity):
+            self._buf[i] = None
+        self._head = 0
+        self._size = 0
+
+    def __len__(self) -> int:
+        return self._size
+
+    def __iter__(self):
+        for i in range(self._size):
+            yield self._buf[(self._head + i) % self._capacity]
+
+
 class BuddyState:
     """In-memory state mirror, write-through to NVS on changes."""
 
