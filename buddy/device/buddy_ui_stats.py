@@ -154,7 +154,10 @@ class StatsRenderer:
             x += _LCD.textWidth(txt) + 4
 
     def _draw_hint_strip(self) -> None:
-        pass  # task 13
+        _LCD.drawFastHLine(0, 116, _W, DIM)
+        _LCD.setTextSize(1)
+        _LCD.setTextColor(GRAY_MID, BLACK)
+        _LCD.drawString("Tab=CD", 6, 120)
 
 
 def _fmt_short(n: int) -> str:
