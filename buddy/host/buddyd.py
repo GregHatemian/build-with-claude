@@ -27,7 +27,7 @@ from pathlib import Path
 from buddy.host.aggregator import DailyAggregator
 from buddy.host.ble_client import CCBleClient
 
-EVENTS_PATH = Path(os.path.expanduser("~/.buddyd/events.jsonl"))
+EVENTS_PATH = Path(os.environ.get("BUDDYD_EVENTS_PATH") or os.path.expanduser("~/.buddyd/events.jsonl"))
 POLL_INTERVAL_S = 2.0
 
 _logger = logging.getLogger("buddyd")

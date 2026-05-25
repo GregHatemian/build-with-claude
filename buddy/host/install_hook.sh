@@ -24,7 +24,7 @@ fi
 cp "${SETTINGS}" "${SETTINGS}.buddyd-backup-$(date +%s)"
 
 python3 - <<PY
-import json, sys
+import json
 from pathlib import Path
 
 path = Path("${SETTINGS}")
@@ -32,19 +32,22 @@ data = json.loads(path.read_text() or "{}")
 hooks = data.setdefault("hooks", {})
 stop = hooks.setdefault("Stop", [])
 
-entry = {
-    "type": "command",
-    "command": "${HOOK_SCRIPT}",
-    "name": "buddyd-stats-hook",
-}
+cmd = "${HOOK_SCRIPT}"
+hook_def = {"type": "command", "command": cmd}
 
-# Idempotent: replace existing entry with the same name, else append.
-for i, h in enumerate(stop):
-    if isinstance(h, dict) and h.get("name") == "buddyd-stats-hook":
-        stop[i] = entry
-        break
+# Claude Code schema: each Stop entry is a wrapper with matcher + hooks
+# array. Idempotency key is the command path inside any wrapper's hooks.
+for wrapper in stop:
+    inner = wrapper.get("hooks", []) if isinstance(wrapper, dict) else []
+    for i, h in enumerate(inner):
+        if isinstance(h, dict) and h.get("command") == cmd:
+            inner[i] = hook_def
+            break
+    else:
+        continue
+    break
 else:
-    stop.append(entry)
+    stop.append({"matcher": "", "hooks": [hook_def]})
 
 path.write_text(json.dumps(data, indent=2))
 print("Installed Stop hook at", path)
