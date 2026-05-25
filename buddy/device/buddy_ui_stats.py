@@ -125,7 +125,44 @@ class StatsRenderer:
             prev_x, prev_y = cx, cy
 
     def _draw_cache_line(self) -> None:
-        pass  # task 12
+        cr = self._hb.get("cache_read")
+        cc = self._hb.get("cache_create")
+        cu = self._hb.get("cache_uncached")
+        if cr is None and cc is None and cu is None:
+            # Source didn't provide cache info — render a dim placeholder.
+            _LCD.setTextSize(1)
+            _LCD.setTextColor(GRAY_MID, BLACK)
+            _LCD.drawString("cache: --", 6, 98)
+            return
+        _LCD.setTextSize(1)
+        x = 6
+        _LCD.setTextColor(GRAY_MID, BLACK)
+        _LCD.drawString("cache", x, 98)
+        x += _LCD.textWidth("cache ")
+        for label, val, color in (
+            ("r:", cr, GREEN),
+            ("c:", cc, CYAN),
+            ("u:", cu, GRAY_MID),
+        ):
+            if val is None:
+                continue
+            _LCD.setTextColor(color, BLACK)
+            txt = label + _fmt_short(val)
+            if x + _LCD.textWidth(txt) > _W - 6:
+                break  # ran out of horizontal room
+            _LCD.drawString(txt, x, 98)
+            x += _LCD.textWidth(txt) + 4
 
     def _draw_hint_strip(self) -> None:
         pass  # task 13
+
+
+def _fmt_short(n: int) -> str:
+    """Compact integer: 1234 -> '1.2K', 1234567 -> '1.2M'."""
+    if n is None:
+        return "?"
+    if n < 1000:
+        return str(n)
+    if n < 1_000_000:
+        return "{:.1f}K".format(n / 1000.0)
+    return "{:.1f}M".format(n / 1_000_000.0)
