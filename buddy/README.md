@@ -38,6 +38,25 @@ python3 scripts/repl_run.py --port /dev/cu.usbmodem1101 --script "import os; pri
 
 `gen_burst_frames.py` regenerates `burst_frames.py` from source sprites.
 
+## Claude Code stats integration
+
+The device's `claude_buddy` app supports two sources, toggled by the
+Tab key on the Cardputer keyboard:
+
+- **CD** — the original Claude Desktop / Hardware Buddy integration.
+- **CC** — Claude Code CLI sessions via the `buddyd` daemon.
+
+Install the daemon + hook:
+
+    pip install -r buddy/host/requirements.txt
+    bash buddy/host/install_hook.sh
+    python -m buddy.host.buddyd
+
+See `buddy/host/README.md` for details. Set `daily_budget_tokens` via
+REPL if you want a different default than 500K:
+
+    import buddy_state; s = buddy_state.BuddyState(); s.set_daily_budget_tokens(2_000_000)
+
 ## References
 
 - `references/` — BLE protocol notes for the Claude Buddy app
