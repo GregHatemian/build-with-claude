@@ -93,7 +93,36 @@ class StatsRenderer:
         _LCD.drawString(line, 6, 52)
 
     def _draw_graph(self) -> None:
-        pass  # task 11
+        # Plot region: x=6..234 (228 wide), y=66..96 (30 tall).
+        x0, y0, w, h = 6, 66, _W - 12, 30
+        # Frame: a faint floor line + dashed budget cap.
+        _LCD.drawFastHLine(x0, y0 + h, w, DIM)
+        budget = self._state.daily_budget_tokens if self._state else 0
+        if budget <= 0 or not self._state or len(self._state.graph_samples) < 2:
+            # Not enough data to draw the line or no budget to scale by.
+            return
+        # Y scale: 0 at bottom (y0+h), budget at top (y0). Anything over
+        # 100% is clamped to top (we already render '999%' in the big
+        # number for that case).
+        def yv(cum):
+            ratio = cum / budget
+            if ratio > 1.0:
+                ratio = 1.0
+            return int(y0 + h - ratio * h)
+        # X scale: oldest sample at x0, newest at x0+w.
+        samples = list(self._state.graph_samples)
+        n = len(samples)
+        # Cap line: every 8 px draw a 4-px dash at y = y0 (top).
+        for x in range(x0, x0 + w, 8):
+            _LCD.drawFastHLine(x, y0, 4, GRAY_MID)
+        # Line: connect successive samples.
+        prev_x = x0
+        prev_y = yv(samples[0][1])
+        for i in range(1, n):
+            cx = x0 + int(i * w / (n - 1))
+            cy = yv(samples[i][1])
+            _LCD.drawLine(prev_x, prev_y, cx, cy, CYAN)
+            prev_x, prev_y = cx, cy
 
     def _draw_cache_line(self) -> None:
         pass  # task 12
