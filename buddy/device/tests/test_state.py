@@ -69,5 +69,21 @@ class TestBuddyStateGraph(unittest.TestCase):
         self.assertEqual(list(s.graph_samples), [])
 
 
+class TestSourceTabPersistence(unittest.TestCase):
+    def test_default_source_tab_is_cd(self):
+        s = buddy_state.BuddyState()
+        self.assertEqual(s.source_tab, "CD")
+
+    def test_set_source_tab_round_trips_in_memory(self):
+        s = buddy_state.BuddyState()
+        s.set_source_tab("CC")
+        self.assertEqual(s.source_tab, "CC")
+
+    def test_invalid_source_tab_is_rejected(self):
+        s = buddy_state.BuddyState()
+        s.set_source_tab("XX")  # invalid — silently ignored
+        self.assertEqual(s.source_tab, "CD")
+
+
 if __name__ == "__main__":
     unittest.main()

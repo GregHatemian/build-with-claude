@@ -152,6 +152,11 @@ class BuddyState:
         self.daily_budget_tokens = _get_u32("daily_budget_tokens", 500_000)
         # 60 samples × 15 min = 15 h horizon. Not persisted across reboots.
         self.graph_samples = RingBuffer(capacity=60)
+        # Active source tab: "CD" (Claude Desktop) or "CC" (Claude Code).
+        # Persisted so reboot keeps the user's last choice.
+        self.source_tab = _get_str("source_tab", "CD")
+        if self.source_tab not in ("CD", "CC"):
+            self.source_tab = "CD"
 
     def set_name(self, name: str) -> None:
         self.name = name[:32]
@@ -236,6 +241,12 @@ class BuddyState:
     def reset_graph(self) -> None:
         self.graph_samples.clear()
 
+    def set_source_tab(self, tab: str) -> None:
+        if tab not in ("CD", "CC"):
+            return
+        self.source_tab = tab
+        _set_str("source_tab", tab)
+
     def reset_all(self) -> None:
         """Called on unpair. Wipes name/owner/counters but not firmware."""
         self.name = "Buddy"
@@ -246,5 +257,6 @@ class BuddyState:
         self._nap_count = 0
         self.daily_budget_tokens = 500_000
         self.graph_samples.clear()
-        for k in ("name", "owner", "appr", "deny", "nap", "daily_budget_tokens"):
+        self.source_tab = "CD"
+        for k in ("name", "owner", "appr", "deny", "nap", "daily_budget_tokens", "source_tab"):
             _erase(k)
