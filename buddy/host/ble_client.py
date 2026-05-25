@@ -84,7 +84,15 @@ class CCBleClient:
             return False
         try:
             line = (json.dumps(heartbeat) + "\n").encode("utf-8")
-            await self._client.write_gatt_char(NUS_RX_CHAR_UUID, line, response=False)
+            # Default ATT MTU is 23 bytes (20 payload). bleak will use a
+            # higher MTU if the peripheral negotiates one, but we can't
+            # introspect that portably across backends, so we chunk at
+            # 20 bytes to be safe. The device's _rx_buf accumulates until
+            # it sees '\n' (see buddy_ble.py), so multi-chunk writes
+            # reassemble correctly.
+            CHUNK = 20
+            for i in range(0, len(line), CHUNK):
+                await self._client.write_gatt_char(NUS_RX_CHAR_UUID, line[i:i + CHUNK], response=False)
             return True
         except Exception as e:
             _logger.warning("write failed: %s", e)

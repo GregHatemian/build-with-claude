@@ -133,6 +133,23 @@ class TestHeartbeatApplication(unittest.TestCase):
         self.proto.on_line(json.dumps({"source": "CC", "daily_total": 1000}).encode("utf-8"))
         self.assertIsNone(self.ui.last_hb)
 
+    def test_cc_heartbeat_records_graph_sample(self):
+        self.state.set_source_tab("CC")
+        self.assertEqual(len(self.state.graph_samples), 0)
+        self.proto.handle_line(json.dumps({
+            "source": "CC", "daily_total": 64200,
+        }))
+        self.assertEqual(len(self.state.graph_samples), 1)
+        # Subsequent CC heartbeat appends another sample.
+        self.proto.handle_line(json.dumps({
+            "source": "CC", "daily_total": 70000,
+        }))
+        self.assertEqual(len(self.state.graph_samples), 2)
+        # CD-shaped heartbeat (no source field, no daily_total) shouldn't
+        # touch graph_samples on CC tab (it's filtered out as wrong source).
+        self.proto.handle_line(json.dumps({"tokens_today": 5000}))
+        self.assertEqual(len(self.state.graph_samples), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

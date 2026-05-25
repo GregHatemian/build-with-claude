@@ -474,11 +474,11 @@ class _UIDispatcher:
         if paint is not None:
             paint()
         else:
-            # CD has no paint() — its set_connection / update_* methods
-            # do incremental redraws as state changes. Trigger a full
-            # CD redraw via update_identity + the current connection state.
-            self._cd.update_identity(self._state.name, self._state.owner)
-            self._cd.set_connection(self._cd._connection_state)
+            # CD has no paint(); _redraw_chrome does an unconditional full
+            # repaint. Going through set_connection would short-circuit when
+            # the connection state hasn't changed (common after a Tab switch
+            # CD → CC → CD where the BLE state is the same as when we left).
+            self._cd._redraw_chrome()
 
     def switch_tab(self):
         # Called by claude_buddy on Tab key. Repaint the now-active renderer.

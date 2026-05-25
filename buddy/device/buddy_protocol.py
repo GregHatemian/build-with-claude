@@ -30,6 +30,16 @@ unknown message is logged and ignored rather than crashing.
 import json
 import time
 
+# Stub MicroPython time functions for CPython testing.
+if not hasattr(time, 'ticks_ms'):
+    _ticks_ms_counter = 0
+    def _ticks_ms():
+        global _ticks_ms_counter
+        _ticks_ms_counter += 1000
+        return _ticks_ms_counter
+    time.ticks_ms = _ticks_ms
+    time.ticks_diff = lambda a, b: a - b
+
 
 FIRMWARE_VERSION = "m5buddy-0.1"
 
@@ -82,6 +92,10 @@ class BuddyProtocol:
         self._unpair_pending_ms = 0
 
     # ----- inbound
+
+    def handle_line(self, s: str) -> None:
+        """Convenience wrapper for tests: accepts a str, delegates to on_line."""
+        self.on_line(s.encode("utf-8"))
 
     def on_line(self, raw: bytes) -> None:
         try:
@@ -164,6 +178,17 @@ class BuddyProtocol:
         # stale messages buffered through a slow BLE link).
         if _heartbeat_source(hb) != self.state.source_tab:
             return
+        # Record a graph sample on every CC heartbeat. CD heartbeats from
+        # Hardware Buddy use tokens_today; CC heartbeats use daily_total
+        # (set by the host aggregator). Skip when neither is present.
+        # Sampling cadence == event cadence (once per assistant turn).
+        # The spec's aspirational 15-min cadence assumed much higher
+        # heartbeat frequency; at one-per-turn the 60-slot ring buffer
+        # covers ~60 turns before evicting the oldest 30, which is the
+        # correct graceful behaviour for long sessions.
+        cum = hb.get("daily_total") or hb.get("tokens_today")
+        if cum is not None:
+            self.state.record_graph_sample(time.ticks_ms(), cum)
         self.ui.update_heartbeat(hb)
         prompt = hb.get("prompt")
         if prompt and prompt.get("id"):

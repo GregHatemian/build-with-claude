@@ -50,8 +50,7 @@ def main(events_path: str = DEFAULT_EVENTS_PATH, now=_now) -> int:
     try:
         os.makedirs(os.path.dirname(events_path), exist_ok=True)
         with open(events_path, "a") as f:
-            f.write(json.dumps(record))
-            f.write("\n")
+            f.write(json.dumps(record) + "\n")
     except OSError:
         # Filesystem error → exit silently. Better to lose a stats event
         # than to make Claude Code feel slow or broken.
